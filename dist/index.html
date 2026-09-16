@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Dashboard locale per l'analisi YTD delle connettività contrattualizzate.">
+  <title>Dashboard Connettività YTD</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="vendor/xlsx.full.min.js" defer></script>
+  <script src="vendor/chart.umd.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand"><span class="brand-mark">CD</span><div><h1>Connettività YTD</h1><p>Controllo operativo</p></div></div>
+      <div class="header-actions">
+        <button class="button secondary" id="exportHistoryBtn" disabled>Esporta storico</button>
+        <label class="button secondary file-button">Importa storico<input type="file" id="historyInput" accept="application/json,.json"></label>
+        <button class="button danger-ghost" id="clearHistoryBtn">Cancella storico</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <section class="upload-panel" id="uploadPanel">
+      <div>
+        <span class="eyebrow">Analisi da inizio anno</span>
+        <h2>Carica il file Excel aggiornato</h2>
+        <p>Formati .xlsx e .xls · viene letto automaticamente il primo foglio utile.</p>
+      </div>
+      <label class="upload-control" id="dropZone">
+        <input type="file" id="fileInput" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+        <span class="upload-icon" aria-hidden="true">↑</span>
+        <span><strong>Seleziona il file</strong><small>oppure trascinalo qui</small></span>
+      </label>
+      <p class="privacy-note"><span aria-hidden="true">●</span> I dati vengono elaborati localmente nel browser e non vengono caricati su server esterni.</p>
+    </section>
+
+    <div id="message" class="message hidden" role="alert"></div>
+    <section id="dashboard" class="dashboard hidden" aria-live="polite">
+      <div class="report-bar">
+        <div><span id="fileName" class="file-name"></span><span id="analysisMeta" class="analysis-meta"></span></div>
+        <div class="report-actions">
+          <label class="threshold-label">Soglia alert <input id="minSample" type="number" min="1" step="1" value="20"></label>
+          <button class="button primary" id="exportExcelBtn">Esporta report Excel</button>
+        </div>
+      </div>
+
+      <section class="kpi-grid primary-kpis" id="primaryKpis"></section>
+      <section class="kpi-grid secondary-kpis" id="secondaryKpis"></section>
+
+      <section class="panel attention-panel">
+        <div class="section-heading"><div><span class="eyebrow">Monitoraggio automatico</span><h2>Punti di attenzione</h2></div><span class="sample-chip" id="sampleChip"></span></div>
+        <div id="alerts" class="alerts-grid"></div>
+      </section>
+
+      <nav class="tabs" aria-label="Sezioni della dashboard">
+        <button class="tab active" data-tab="overview">Panoramica</button>
+        <button class="tab" data-tab="suppliers">Fornitori</button>
+        <button class="tab" data-tab="regions">Regioni</button>
+        <button class="tab" data-tab="technologies">Tecnologie</button>
+        <button class="tab" data-tab="cross">Fornitore × Regione</button>
+        <button class="tab" data-tab="quality">Qualità dati</button>
+      </nav>
+
+      <section class="tab-panel active" id="tab-overview">
+        <div class="chart-grid">
+          <article class="panel chart-card"><div class="chart-title"><h3>KO % per fornitore</h3><span>Campione core</span></div><div class="chart-wrap rank"><canvas id="chartSupplierKo"></canvas></div></article>
+          <article class="panel chart-card"><div class="chart-title"><h3>Backlog % per fornitore</h3><span>Solo Attivazione</span></div><div class="chart-wrap rank"><canvas id="chartSupplierBacklog"></canvas></div></article>
+          <article class="panel chart-card wide"><div class="chart-title"><h3>Tempi per fornitore</h3><span>Media e P90 · giorni calendario</span></div><div class="chart-wrap"><canvas id="chartSupplierTime"></canvas></div></article>
+          <article class="panel chart-card"><div class="chart-title"><h3>KO % per regione</h3><span>Campione core</span></div><div class="chart-wrap rank"><canvas id="chartRegionKo"></canvas></div></article>
+          <article class="panel chart-card"><div class="chart-title"><h3>Backlog % per regione</h3><span>Solo Attivazione</span></div><div class="chart-wrap rank"><canvas id="chartRegionBacklog"></canvas></div></article>
+          <article class="panel chart-card"><div class="chart-title"><h3>Distribuzione per tecnologia</h3><span>Pratiche analizzate</span></div><div class="chart-wrap"><canvas id="chartTech"></canvas></div></article>
+          <article class="panel chart-card wide"><div class="chart-title"><h3>Trend mensile</h3><span>Snapshot salvati nel browser</span></div><div class="chart-wrap"><canvas id="chartHistory"></canvas></div></article>
+        </div>
+        <article class="panel aging-panel"><div class="section-heading"><div><span class="eyebrow">Backlog</span><h2>Distribuzione aging</h2></div><span class="sample-chip" id="agingMeta"></span></div><div id="agingBuckets" class="aging-buckets"></div></article>
+        <article class="panel aging-panel"><div class="section-heading"><div><span class="eyebrow">Attivazioni valide</span><h2>Dettaglio tempi</h2></div></div><div id="activationDetails" class="aging-buckets"></div></article>
+      </section>
+
+      <section class="tab-panel" id="tab-suppliers"><article class="panel table-panel"><div class="section-heading"><div><span class="eyebrow">Performance</span><h2>Analisi per fornitore</h2></div><span class="hint">Seleziona un'intestazione per ordinare</span></div><div class="table-scroll"><table id="supplierTable"></table></div></article></section>
+      <section class="tab-panel" id="tab-regions"><article class="panel table-panel"><div class="section-heading"><div><span class="eyebrow">Territorio</span><h2>Analisi per regione</h2></div><span class="hint">Le criticità sono evidenziate sul campione minimo</span></div><div class="table-scroll"><table id="regionTable"></table></div></article></section>
+      <section class="tab-panel" id="tab-technologies"><article class="panel table-panel"><div class="section-heading"><div><span class="eyebrow">Portafoglio</span><h2>Analisi per tecnologia</h2></div></div><div class="table-scroll"><table id="techTable"></table></div></article></section>
+      <section class="tab-panel" id="tab-cross"><article class="panel table-panel"><div class="section-heading"><div><span class="eyebrow">Diagnosi combinata</span><h2>Fornitore × Regione</h2></div><span class="hint">Gruppi piccoli esclusi dagli alert, non dalla tabella</span></div><div class="table-scroll"><table id="crossTable"></table></div></article></section>
+      <section class="tab-panel" id="tab-quality"><article class="panel"><div class="section-heading"><div><span class="eyebrow">Controlli automatici</span><h2>Qualità dati</h2></div></div><div id="qualityGrid" class="quality-grid"></div></article></section>
+
+      <details class="panel methodology">
+        <summary>Legenda e metodologia</summary>
+        <div class="method-grid">
+          <div><strong>Pratiche analizzate</strong><p>Attivo + Attivazione + KO.</p></div>
+          <div><strong>Backlog</strong><p>Esclusivamente stato “Attivazione”. “Attesa Connettività” è esclusa.</p></div>
+          <div><strong>Backlog %</strong><p>Backlog / Pratiche analizzate.</p></div>
+          <div><strong>KO %</strong><p>KO / Pratiche analizzate.</p></div>
+          <div><strong>Tempo attivazione</strong><p>Data R − Data P, in giorni di calendario.</p></div>
+          <div><strong>Aging backlog</strong><p>Data di analisi − Data P, in giorni di calendario.</p></div>
+          <div><strong>P90</strong><p>Giorni entro cui si conclude il 90% delle attivazioni valide.</p></div>
+          <div><strong>Anomalie date</strong><p>R mancante sulle attive, R precedente a P, R futura o P mancante.</p></div>
+        </div>
+      </details>
+    </section>
+  </main>
+  <footer>Dashboard Connettività YTD · Elaborazione locale</footer>
+</body>
+</html>
